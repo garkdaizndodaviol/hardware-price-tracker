@@ -26,21 +26,31 @@ def interface():
     st.title("Cadastro de Produtos")
 
     # Inicializar session_state
-    for key in ["categoria", "nome", "valor", "cupom", "link"]:
+    for key in ["categoria", "nome", "valor", "cupom", "link", "reset_form"]:
         if key not in st.session_state:
             if key == "valor":
                 st.session_state[key] = 0.0
             elif key == "categoria":
                 st.session_state[key] = "CPU"
+            elif key == "reset_form":
+                st.session_state[key] = False
             else:
                 st.session_state[key] = ""
+
+    # Resetar o formulário se sinalizado
+    if st.session_state["reset_form"]:
+        st.session_state["categoria"] = "CPU"
+        st.session_state["nome"] = ""
+        st.session_state["valor"] = 0.0
+        st.session_state["cupom"] = ""
+        st.session_state["link"] = ""
+        st.session_state["reset_form"] = False  # limpa a flag
 
     # Inicializar dados da tabela na sessão
     if "dados_produtos" not in st.session_state:
         st.session_state["dados_produtos"] = carregar_dados()
 
-    envio_sucesso = False
-
+    # Formulário
     with st.form("formulario"):
         col1, col2, col3 = st.columns(3)
         categoria = col1.selectbox("Categoria", ["CPU", "Placa Mãe", "Memoria RAM", "Monitor"], key="categoria")
@@ -58,18 +68,19 @@ def interface():
                 st.error("O campo 'Link da Promoção' é obrigatório.")
             else:
                 data = datetime.datetime.now().strftime('%Y-%m-%d')
-                salvar_dados({"Categoria": categoria, "Nome": nome, "Valor": valor, "Cupom": cupom, "Data": data, "Link": link})
+                salvar_dados({
+                    "Categoria": categoria,
+                    "Nome": nome,
+                    "Valor": valor,
+                    "Cupom": cupom,
+                    "Data": data,
+                    "Link": link
+                })
                 st.success("Produto salvo com sucesso!")
-                envio_sucesso = True
-
-    if envio_sucesso:
-        st.session_state["categoria"] = "CPU"
-        st.session_state["nome"] = ""
-        st.session_state["valor"] = 0.0
-        st.session_state["cupom"] = ""
-        st.session_state["link"] = ""
-        # Atualizar tabela
-        st.session_state["dados_produtos"] = carregar_dados()
+                # Aciona o reset seguro
+                st.session_state["reset_form"] = True
+                # Atualiza a tabela exibida
+                st.session_state["dados_produtos"] = carregar_dados()
 
     st.markdown("---")
     st.subheader("Consultar Produtos")
