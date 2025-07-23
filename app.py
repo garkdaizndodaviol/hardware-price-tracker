@@ -18,14 +18,14 @@ def carregar_dados():
     registros = db.all()
     return pd.DataFrame(registros)
 
-def remover_registro(index):
-    db.remove(doc_ids=[index])
+def remover_registro(doc_id):
+    db.remove(doc_ids=[doc_id])
 
 def interface():
     st.set_page_config(page_title="Cadastro de Hardware", layout="wide")
     st.title("Cadastro de Produtos")
 
-    # Inicializar session_state se não existir
+    # Inicializar session_state
     for key in ["categoria", "nome", "valor", "cupom", "link"]:
         if key not in st.session_state:
             if key == "valor":
@@ -34,6 +34,12 @@ def interface():
                 st.session_state[key] = "CPU"
             else:
                 st.session_state[key] = ""
+
+    # Inicializar dados da tabela na sessão
+    if "dados_produtos" not in st.session_state:
+        st.session_state["dados_produtos"] = carregar_dados()
+
+    envio_sucesso = False
 
     with st.form("formulario"):
         col1, col2, col3 = st.columns(3)
@@ -54,12 +60,16 @@ def interface():
                 data = datetime.datetime.now().strftime('%Y-%m-%d')
                 salvar_dados({"Categoria": categoria, "Nome": nome, "Valor": valor, "Cupom": cupom, "Data": data, "Link": link})
                 st.success("Produto salvo com sucesso!")
-                # Resetar campos do formulário
-                st.session_state["categoria"] = "CPU"
-                st.session_state["nome"] = ""
-                st.session_state["valor"] = 0.0
-                st.session_state["cupom"] = ""
-                st.session_state["link"] = ""
+                envio_sucesso = True
+
+    if envio_sucesso:
+        st.session_state["categoria"] = "CPU"
+        st.session_state["nome"] = ""
+        st.session_state["valor"] = 0.0
+        st.session_state["cupom"] = ""
+        st.session_state["link"] = ""
+        # Atualizar tabela
+        st.session_state["dados_produtos"] = carregar_dados()
 
     st.markdown("---")
     st.subheader("Consultar Produtos")
@@ -69,7 +79,7 @@ def interface():
     data_inicio = col1.date_input("Data inicial", format="YYYY-MM-DD")
     data_fim = col2.date_input("Data final", format="YYYY-MM-DD")
 
-    df = carregar_dados()
+    df = st.session_state["dados_produtos"]
 
     if filtro_nome:
         df = df[df['Nome'].str.contains(filtro_nome, case=False, na=False)]
@@ -86,10 +96,12 @@ def interface():
         st.subheader("Remover Registro")
         index_para_remover = st.number_input("Digite o índice da linha que deseja remover:", min_value=0, max_value=len(df) - 1, step=1)
         if st.button("Remover Linha"):
-            doc_id = db.all()[index_para_remover].doc_id
+            registros_completos = carregar_dados()
+            doc_id = registros_completos.iloc[index_para_remover].name  # Pega o doc_id real do TinyDB
             remover_registro(doc_id)
             st.success(f"Linha {index_para_remover} removida com sucesso!")
-            st.experimental_rerun()
+            # Atualizar dados no estado
+            st.session_state["dados_produtos"] = carregar_dados()
 
     if st.button("Gerar Gráfico de Histórico de Preço"):
         if df.empty:
@@ -97,7 +109,7 @@ def interface():
         else:
             fig, ax = plt.subplots(figsize=(10, 6))
             pivot_df = df.pivot_table(index="Nome", columns="Data", values="Valor")
-            pivot_df = pivot_df.sort_index(axis=1)  # Ordenar datas
+            pivot_df = pivot_df.sort_index(axis=1)
             pivot_df.T.plot(ax=ax, marker='o')
             ax.set_title('Histórico de Preço dos Produtos')
             ax.set_xlabel('Data')
